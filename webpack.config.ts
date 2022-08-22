@@ -32,6 +32,7 @@ const config: Configuration = {
     }),
     new HtmlWebpackPlugin({
       template: "./index.html",
+      inject: "body",
     }),
   ],
   resolve: {
