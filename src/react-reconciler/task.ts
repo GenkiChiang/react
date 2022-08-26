@@ -1,67 +1,28 @@
 import { TaskQueue } from "../misc/TaskQueue";
-import { Fiber } from "../react-fiber/types/Fiber";
-import {
-  createFiber,
-  createFiberFromText,
-  createHostRootFiber,
-} from "../react-fiber/Fiber";
+import { Fiber, RootFiber } from "../react-fiber/types/Fiber";
+import { createHostRootFiber } from "../react-fiber/Fiber";
 import { Container } from "src/react-dom/types/Container";
-import { getTag } from "../misc/getFiberWorkTagFromReactElement";
-import { createStateNode } from "../react-fiber/createStateNode";
-import { isTextChild } from "../react-dom/textNode";
-import { isArray } from "lodash/fp";
+import { WorkTags } from "../react-fiber/ReactWorkTags";
+import { ClassComponent } from "src/react/types/Component";
+import { reconcileChild } from "./reconciler";
+import { FiberFlags } from "../react-fiber/ReactFiberFlags";
 
 export const taskQueue = new TaskQueue();
 let subTask = null;
 let pendingCommit: Fiber;
-const getFirstTask = (): Fiber => {
+const getFirstTask = (): RootFiber => {
   const task = taskQueue.pop();
 
   // console.log(task)
   const hostRootFiber = createHostRootFiber(task.props);
-  hostRootFiber.stateNode = task.stateNode;
-  return hostRootFiber;
-};
-
-const reconcileChildren = (subTask: Fiber, children) => {
-  let currentFiber = subTask;
-  // let nextFiber = null;
-  let index = 0;
-  let lastIndex;
-  let prevFiber: Fiber;
-  const length = children.length;
-  if (!isArray(children)) {
-    if (isTextChild(children)) {
-      const nextFiber = createFiberFromText(children);
-      nextFiber.return = currentFiber;
-      nextFiber.stateNode = createStateNode(nextFiber);
-
-      currentFiber.child = nextFiber;
-    } else {
-      // single object child
-      const nextFiber = createFiber(getTag(children), children.props);
-      nextFiber.return = currentFiber;
-      nextFiber.stateNode = createStateNode(nextFiber);
-
-      currentFiber.child = nextFiber;
-    }
+  hostRootFiber.stateNode = task.stateNode as Container;
+  hostRootFiber.alternate = hostRootFiber.stateNode._reactRootContainer;
+  if (!hostRootFiber.stateNode._reactRootContainer) {
+    hostRootFiber.flags = FiberFlags.Placement;
   } else {
-    children.forEach((child, index) => {
-      // if()
-      const nextFiber: Fiber = createFiber(getTag(child), child.props);
-      nextFiber.return = currentFiber;
-      nextFiber.type = child.type;
-      nextFiber.index = index;
-
-      nextFiber.stateNode = createStateNode(nextFiber);
-      if (index === 0) {
-        currentFiber.child = nextFiber;
-      } else {
-        prevFiber.sibling = nextFiber;
-      }
-      prevFiber = nextFiber;
-    });
+    hostRootFiber.flags = FiberFlags.Update;
   }
+  return hostRootFiber;
 };
 
 const executeTask = (subTask: Fiber): Fiber | null => {
@@ -72,7 +33,7 @@ const executeTask = (subTask: Fiber): Fiber | null => {
   // if (subTask.tag === WorkTags.HostRoot) {
   // console.log(subTask.props?.children);
   if (subTask.props?.children) {
-    reconcileChildren(subTask, subTask.props.children);
+    reconcileChild(subTask, subTask.props.children);
   }
   // }
 
@@ -105,20 +66,27 @@ const executeTask = (subTask: Fiber): Fiber | null => {
   // console.log(currentExecuteFiber)
   pendingCommit = currentExecuteFiber;
 };
-export const commitAllWork = (fiber: Fiber) => {
+export const commitAllWork = (fiber: RootFiber) => {
   /**
    * 遍历子节点，构建dom树
    */
   // console.log("commitAllWork");
   // console.log(fiber);
-  fiber.effects.forEach((effectFiberEffect) => {
+  fiber.effects.forEach((fiberEffect) => {
     // if(fiber.flags===FiberFlags.Placement){
     // }
-    const parentFiber = effectFiberEffect.return;
+    const parentFiber = fiberEffect.return;
+
     (parentFiber.stateNode as Container).appendChild(
-      effectFiberEffect.stateNode as Node
+      fiberEffect.stateNode as Node
     );
+
+    if (fiberEffect.tag === WorkTags.ClassComponent) {
+      (fiberEffect.stateNode as ClassComponent).componentDidMount();
+    }
   });
+
+  (<Container>fiber.stateNode)._reactRootContainer = <RootFiber>fiber;
 };
 export const workLoop = (idleDeadline: IdleDeadline) => {
   if (!subTask) {
@@ -133,7 +101,7 @@ export const workLoop = (idleDeadline: IdleDeadline) => {
 
   if (pendingCommit) {
     // TODO: flush all commit
-    commitAllWork(pendingCommit);
+    commitAllWork(pendingCommit as RootFiber);
   }
 };
 export const performTask = (idleDeadline: IdleDeadline) => {

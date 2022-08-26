@@ -6,6 +6,7 @@ import {
 } from "../../react/types/ReactElement";
 import { FiberFlags } from "../ReactFiberFlags";
 import { WorkTags } from "../ReactWorkTags";
+import { Container } from "../../react-dom/types/Container";
 
 export interface Fiber<P = any, T = ReactElementType> {
   type: T; // 节点类型 (元素, 文本, 组件)(具体的类型)
@@ -34,6 +35,7 @@ export interface Fiber<P = any, T = ReactElementType> {
   // memorizedProps;
   // memorizedState;
 }
-export interface FiberRoot extends Fiber {
+export interface RootFiber extends Fiber {
   tag: WorkTags.HostRoot;
+  stateNode: Container | null;
 }

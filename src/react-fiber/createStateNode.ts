@@ -10,8 +10,9 @@ type StateNodeStrategyPattern = {
   [K in WorkTags]: (fiber: Fiber) => Fiber["stateNode"];
 };
 const stateNodeStrategyPattern: Partial<StateNodeStrategyPattern> = {
-  [WorkTags.ClassComponent]: (fiber: Fiber) =>
-    new (fiber.type as ClassComponent)(fiber.props),
+  [WorkTags.ClassComponent]: (fiber: Fiber) => {
+    return new (fiber.type as ClassComponent)(fiber.props);
+  },
   [WorkTags.FunctionComponent]: (fiber: Fiber) => null,
   [WorkTags.HostComponent]: (fiber: Fiber) => createDomElement(fiber),
   [WorkTags.HostText]: (fiber: Fiber) => createTextNode(fiber),
