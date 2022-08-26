@@ -1,4 +1,5 @@
-import React from "../src";
+import { Container } from "src/react-dom/types/Container";
+import * as React from "../src";
 
 const root = document.getElementById("app");
 
@@ -7,9 +8,6 @@ const virtualDom = (
     <p>hello React</p>
   </div>
 );
-// setTimeout(() => {
-//   ImpReact.render(
-//     <TestFnComponent title="改变后的函数组件" content="改变后的函数组件内容" />,
-//     root
-//   );
-// }, 2000);
+setTimeout(() => {
+  React.render(virtualDom, root as Container);
+}, 2000);

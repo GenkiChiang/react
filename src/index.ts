@@ -1,6 +1,2 @@
-const React = {
-  createElement: () => {
-    console.log('im called')
-  },
-};
-export default React;
+export * from "./react";
+export * from "./react-dom";

@@ -4,6 +4,7 @@ import {
   ReactElement,
   ReactElementType,
   ReactKey,
+  ReactNode,
   ReactRef,
 } from "./types/ReactElement";
 import { hasValidKey, hasValidRef, isFalsy } from "./utils";
@@ -35,23 +36,27 @@ export const createElement = (type, config, ...children): ReactElement => {
   }
 
   // resolve virtual dom's children
-  const childrenElement: ReactElement[] = [...children].reduce(
-    (previousValue, child) => {
+  let childrenElement: ReactNode;
+  if (children.length === 1) {
+    // childrenElement = isFalsy(children[0]) ? null: children[0];
+    childrenElement = children[0];
+  } else {
+    childrenElement = [...children].reduce((previousValue, child) => {
       // 忽略 undefined null NAN boolean [] {}
       if (isFalsy(child)) {
         return previousValue;
       }
       // array or object
-      if (isObject(child)) {
-        previousValue.push(child);
-      } else {
-        previousValue.push(createElement("text", null, child));
-      }
+      // if (isObject(child)) {
+      previousValue.push(child);
+      // } else {
+      // previousValue.push(createElement("text", child));
+      // }
 
       return previousValue;
-    },
-    []
-  );
+    }, []);
+  }
+
   Object.freeze(childrenElement);
   props.children = childrenElement;
 
