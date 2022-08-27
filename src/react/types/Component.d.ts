@@ -1,5 +1,6 @@
 import { Container } from "src/react-dom/types/Container";
 import { Component } from "../Component";
+import { ReactElement } from "./ReactElement";
 export interface ClassComponent<P = any, S = any> extends Component<P, S> {
   new (props: Readonly<P>): ClassComponent<P, S>;
   defaultProps: P;
@@ -8,7 +9,7 @@ export interface ClassComponent<P = any, S = any> extends Component<P, S> {
 }
 export interface PureComponent extends ClassComponent {}
 export interface FunctionComponent<P = any, S = any> {
-  (props): void;
+  (props: Readonly<P>): ReactElement<P, S>;
   defaultProps: P;
 }
 export type FC<P = any, S = any> = FunctionComponent<P, S>;

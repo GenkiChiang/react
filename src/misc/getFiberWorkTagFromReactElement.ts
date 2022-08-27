@@ -7,7 +7,7 @@ export const getTag = (element: ReactElement): WorkTags => {
     return WorkTags.HostComponent;
   }
 
-  return type.prototype.isReactComponent
+  return type.prototype?.isReactComponent
     ? WorkTags.ClassComponent
     : WorkTags.FunctionComponent;
 };

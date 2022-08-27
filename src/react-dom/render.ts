@@ -10,7 +10,7 @@ export const render = (element: ReactElement, container: Container) => {
   taskQueue.push({
     stateNode: container,
     props: {
-      children: [element],
+      children: element,
     },
   });
 

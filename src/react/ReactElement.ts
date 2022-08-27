@@ -1,4 +1,3 @@
-import { isObject } from "lodash/fp";
 import {
   PropsWithChildren,
   ReactElement,

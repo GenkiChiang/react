@@ -1,4 +1,5 @@
 import { voidFunction } from "../misc/voidFunction";
+import { ReactElement } from "./types/ReactElement";
 
 export abstract class ComponentLifecycle<P = any, S = any> {
   abstract readonly state: S;
@@ -8,7 +9,7 @@ export abstract class ComponentLifecycle<P = any, S = any> {
   componentDidMount() {}
   componentWillUnmount() {}
 
-  componentWillReceiveProps(nextProps: Readonly<P>){}
+  componentWillReceiveProps(nextProps: Readonly<P>) {}
   shouldComponentUpdate(
     nextProps: Readonly<P>,
     nextState: Readonly<S>
@@ -60,8 +61,10 @@ export abstract class Component<P = any, S = any> extends ComponentLifecycle<
   // }
 
   isReactComponent = true;
-  // abstract render(): ReactElement;
+  abstract render(): ReactElement;
 }
+Component.prototype.isReactComponent = true
+
 export abstract class PureComponent<P = any, S = any> extends Component<P, S> {
   shouldComponentUpdate(
     nextProps: Readonly<P>,

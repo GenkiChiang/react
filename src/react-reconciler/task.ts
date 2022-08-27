@@ -4,7 +4,7 @@ import { createHostRootFiber } from "../react-fiber/Fiber";
 import { Container } from "src/react-dom/types/Container";
 import { WorkTags } from "../react-fiber/ReactWorkTags";
 import { ClassComponent } from "src/react/types/Component";
-import { reconcileChild } from "./reconciler";
+import { reconcileChildDispatcher } from "./reconciler";
 import { FiberFlags } from "../react-fiber/ReactFiberFlags";
 
 export const taskQueue = new TaskQueue();
@@ -17,11 +17,10 @@ const getFirstTask = (): RootFiber => {
   const hostRootFiber = createHostRootFiber(task.props);
   hostRootFiber.stateNode = task.stateNode as Container;
   hostRootFiber.alternate = hostRootFiber.stateNode._reactRootContainer;
-  if (!hostRootFiber.stateNode._reactRootContainer) {
-    hostRootFiber.flags = FiberFlags.Placement;
-  } else {
-    hostRootFiber.flags = FiberFlags.Update;
-  }
+  hostRootFiber.flags = hostRootFiber.stateNode._reactRootContainer
+    ? FiberFlags.Update
+    : FiberFlags.Placement;
+
   return hostRootFiber;
 };
 
@@ -32,9 +31,11 @@ const executeTask = (subTask: Fiber): Fiber | null => {
   // console.log(subTask);
   // if (subTask.tag === WorkTags.HostRoot) {
   // console.log(subTask.props?.children);
-  if (subTask.props?.children) {
-    reconcileChild(subTask, subTask.props.children);
-  }
+  // if (subTask.props?.children) {
+  //   reconcileChild(subTask, subTask.props.children);
+  // }
+
+  reconcileChildDispatcher(subTask.tag, subTask);
   // }
 
   /**
@@ -49,7 +50,6 @@ const executeTask = (subTask: Fiber): Fiber | null => {
    * 如果不存在同级，寻找父级fiber，看是否有同级
    */
   let currentExecuteFiber: Fiber = subTask;
-  // console.log(currentExecuteFiber)
   while (currentExecuteFiber.return) {
     // 收集effects
     currentExecuteFiber.return.effects =
@@ -63,27 +63,40 @@ const executeTask = (subTask: Fiber): Fiber | null => {
     }
     currentExecuteFiber = currentExecuteFiber.return;
   }
-  // console.log(currentExecuteFiber)
+
   pendingCommit = currentExecuteFiber;
 };
 export const commitAllWork = (fiber: RootFiber) => {
   /**
    * 遍历子节点，构建dom树
    */
-  // console.log("commitAllWork");
-  // console.log(fiber);
   fiber.effects.forEach((fiberEffect) => {
     // if(fiber.flags===FiberFlags.Placement){
     // }
-    const parentFiber = fiberEffect.return;
+    if (
+      fiberEffect.tag === WorkTags.ClassComponent ||
+      fiberEffect.tag === WorkTags.FunctionComponent
+    ) {
+      return;
+    }
+    let returnFiber = fiberEffect.return;
 
-    (parentFiber.stateNode as Container).appendChild(
+    while (
+      returnFiber.tag === WorkTags.ClassComponent ||
+      returnFiber.tag === WorkTags.FunctionComponent
+    ) {
+      returnFiber = returnFiber.return;
+    }
+
+    // if (returnFiber.tag === WorkTags.HostComponent) {
+    (<Container>returnFiber.stateNode).appendChild(
       fiberEffect.stateNode as Node
     );
+    // }
 
-    if (fiberEffect.tag === WorkTags.ClassComponent) {
-      (fiberEffect.stateNode as ClassComponent).componentDidMount();
-    }
+    // if (fiberEffect.tag === WorkTags.ClassComponent) {
+    //   (fiberEffect.stateNode as ClassComponent).componentDidMount();
+    // }
   });
 
   (<Container>fiber.stateNode)._reactRootContainer = <RootFiber>fiber;
@@ -104,6 +117,7 @@ export const workLoop = (idleDeadline: IdleDeadline) => {
     commitAllWork(pendingCommit as RootFiber);
   }
 };
+
 export const performTask = (idleDeadline: IdleDeadline) => {
   /**
    * 1. 执行任务
