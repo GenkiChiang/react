@@ -1,39 +1,77 @@
 import { Fiber } from "../react-fiber/types/Fiber";
-import {any, isArray, isObject } from "lodash/fp";
+import { isArray, isObject } from "lodash/fp";
 import { isTextChild } from "../react-dom/textNode";
-import { createFiber, createFiberFromText } from "../react-fiber/Fiber";
+import {
+  createFiberFromElement,
+  createFiberFromText,
+} from "../react-fiber/Fiber";
 import { createStateNode } from "../react-fiber/createStateNode";
-import { getTag } from "../misc/getFiberWorkTagFromReactElement";
 import { WorkTags } from "../react-fiber/ReactWorkTags";
 import { ClassComponent, FunctionComponent } from "../react/types/Component";
 import { ReactElement, ReactNode } from "../react/types/ReactElement";
 import { FiberFlags } from "../react-fiber/ReactFiberFlags";
 
+export const deleteChild = (returnFiber: Fiber, child: Fiber) => {
+  const deletions = returnFiber.deletions;
+  child.flags = FiberFlags.ChildDeletion;
+  if (!deletions) {
+    returnFiber.deletions = [child];
+  } else {
+    deletions.push(child);
+  }
+};
+export const deleteRemainingChildren = (returnFiber: Fiber, fiber: Fiber) => {
+  if (!fiber) {
+    return;
+  }
+  while (fiber) {
+    deleteChild(returnFiber, fiber);
+    fiber = fiber.sibling;
+  }
+  // TODO:
+};
 export const reconcileChildrenArray = (
   returnFiber: Fiber,
-  currentFirstFiber: Fiber,
+  currentFirstChild: Fiber,
   children: ReactElement[]
 ) => {
   // TODO: 处理子元素是数组的情况
-  let  oldAlternate = returnFiber.child.alternate;
+  let oldFiber = returnFiber.alternate?.child;
 
   let prevFiber: Fiber;
   let nextFiber: Fiber;
   children.forEach((childElement, index) => {
-    nextFiber = createFiber(getTag(childElement), childElement.props);
-    nextFiber.type = childElement.type;
+    // reconcileChild(returnFiber,childElement)
+    if (typeof childElement === "string") {
+      nextFiber = reconcileSingleTextNode(
+        returnFiber,
+        null,
+        childElement as string
+      );
+
+      // TODO: 这里有问题，不该再设置一次flags。   reconciler需要重构一下逻辑！
+      nextFiber.flags = FiberFlags.Placement;
+      // nextFiber.sibling
+    } else {
+      nextFiber = createFiberFromElement(childElement);
+    }
     nextFiber.return = returnFiber;
     nextFiber.index = index;
 
-    if (oldAlternate) {
+    if (oldFiber) {
+      // 更新操作
+      nextFiber.alternate = oldFiber;
       nextFiber.flags = FiberFlags.Update;
-      if (oldAlternate.type === nextFiber.type) {
-        nextFiber.stateNode = oldAlternate.stateNode;
+      if (oldFiber.type === nextFiber.type) {
+        nextFiber.stateNode = oldFiber.stateNode;
       } else {
         nextFiber.stateNode = createStateNode(nextFiber);
       }
     } else {
-      nextFiber.flags = FiberFlags.Placement;
+      // 创建操作
+      // nextFiber.flags = FiberFlags.Placement;
+      // 备份
+      nextFiber.alternate = nextFiber;
       nextFiber.stateNode = createStateNode(nextFiber);
     }
     // nextFiber.stateNode = createStateNode(nextFiber);
@@ -46,13 +84,17 @@ export const reconcileChildrenArray = (
       prevFiber.sibling = nextFiber;
     }
 
-    if(oldAlternate.sibling){
-      oldAlternate = oldAlternate.sibling
+    if (oldFiber?.sibling) {
+      oldFiber = oldFiber.sibling;
+      if (index === children.length) {
+        // TODO: delete oldFiber
+        deleteRemainingChildren(returnFiber, oldFiber);
+      }
     }
-    // 备份
-    nextFiber.alternate = nextFiber;
+
     prevFiber = nextFiber;
   });
+  // deleteOldFiber(oldAlternate)
 };
 
 export const reconcileSingleTextNode = (
@@ -61,26 +103,41 @@ export const reconcileSingleTextNode = (
   childElement: string
 ) => {
   // TODO: 处理子元素是文本的情况
-  const oldAlternate = returnFiber.child.alternate;
+  const oldFiber = returnFiber.alternate?.child;
 
   const nextFiber = createFiberFromText(childElement);
   nextFiber.return = returnFiber;
 
-  if (oldAlternate) {
+  if (oldFiber) {
+    if (oldFiber?.sibling) {
+      // TODO: should delete oldFiber?
+      deleteRemainingChildren(returnFiber, oldFiber.sibling);
+    }
+    // 更新操作
     nextFiber.flags = FiberFlags.Update;
-    if (oldAlternate.type === nextFiber.type) {
-      nextFiber.stateNode = oldAlternate.stateNode;
+    nextFiber.alternate = oldFiber;
+
+    if (oldFiber.type === nextFiber.type) {
+      nextFiber.stateNode = oldFiber.stateNode;
     } else {
       nextFiber.stateNode = createStateNode(nextFiber);
     }
   } else {
-    nextFiber.flags = FiberFlags.Placement;
-
+    // 创建操作
+    // nextFiber.flags = FiberFlags.Placement;
+    nextFiber.alternate = nextFiber;
     nextFiber.stateNode = createStateNode(nextFiber);
   }
 
-  nextFiber.alternate = nextFiber;
-  returnFiber.child = nextFiber;
+  // nextFiber.alternate = nextFiber;
+  // if(currentFirstFiber)
+  console.log("returnFiber.child");
+  console.log(returnFiber);
+  if (!returnFiber.child) {
+    returnFiber.child = nextFiber;
+  }
+
+  return nextFiber;
 };
 
 export const reconcileSingleElement = (
@@ -89,26 +146,33 @@ export const reconcileSingleElement = (
   childElement: ReactElement
 ) => {
   // TODO: 处理子元素是单个对象的情况
-  const oldAlternate = returnFiber.child.alternate;
+  const oldFiber = returnFiber.alternate?.child;
 
-  const nextFiber = createFiber(getTag(childElement), childElement.props);
-  nextFiber.type = childElement.type;
+  // console.log(childElement)
+  const nextFiber = createFiberFromElement(childElement);
   nextFiber.return = returnFiber;
 
   /**
    * 执行diff
    */
-  if (oldAlternate) {
+  if (oldFiber) {
+    if (oldFiber?.sibling) {
+      // TODO: should delete oldFiber?
+      deleteRemainingChildren(returnFiber, oldFiber.sibling);
+    }
+    // 更新操作
     nextFiber.flags = FiberFlags.Update;
+    nextFiber.alternate = oldFiber;
 
-    if (oldAlternate.type === nextFiber.type) {
-      nextFiber.stateNode = oldAlternate.stateNode;
+    if (oldFiber.type === nextFiber.type) {
+      nextFiber.stateNode = oldFiber.stateNode;
     } else {
       nextFiber.stateNode = createStateNode(nextFiber);
     }
   } else {
     // 初始渲染
-    nextFiber.flags = FiberFlags.Placement;
+    // nextFiber.flags = FiberFlags.Placement;
+    nextFiber.alternate = nextFiber;
 
     nextFiber.stateNode = createStateNode(nextFiber);
   }
@@ -116,8 +180,9 @@ export const reconcileSingleElement = (
   if (nextFiber.tag === WorkTags.ClassComponent) {
     (nextFiber.stateNode as ClassComponent).componentWillMount();
   }
-  nextFiber.alternate = nextFiber;
   returnFiber.child = nextFiber;
+
+  return nextFiber;
 };
 
 type ReconcileChildStrategyPattern = {
@@ -152,14 +217,25 @@ export const reconcileChildDispatcher = (
 
 export const reconcileChild = (returnFiber: Fiber, child: ReactNode) => {
   if (isArray(child)) {
-    reconcileChildrenArray(returnFiber, null, child);
+    return reconcileChildrenArray(returnFiber, null, child);
   } else if (isTextChild(child)) {
-    reconcileSingleTextNode(returnFiber, null, child);
+    return reconcileSingleTextNode(returnFiber, null, child);
   } else if (isObject(child)) {
-    reconcileSingleElement(returnFiber, null, child as ReactElement);
+    return reconcileSingleElement(returnFiber, null, child as ReactElement);
   }
 };
 
 export const scheduleUpdate = () => {
+  // TODO:
+};
+
+export const mountReconcileChild = () => {
+  // TODO:
+};
+export const updateReconcileChild = () => {
+  // TODO:
+};
+
+export const insertChild = () => {
   // TODO:
 };

@@ -6,6 +6,8 @@ import {
   isPlainObject,
   isUndefined,
 } from "lodash/fp";
+import { ReactElement } from "./types/ReactElement";
+import { Component } from "./Component";
 
 export const hasValidKey = (props) => props.key !== undefined;
 export const hasValidRef = (props) => props.ref !== undefined;
@@ -29,4 +31,17 @@ export const isFalsy = (value: any) => {
   }
   return false;
 };
-
+//
+// export  const  isComponent = (element: ReactElement) => {
+//   const type = element.type
+//   if(!type){
+//     return false
+//   }
+//
+// }
+export const isClassComponent = () => {};
+export const shouldConstruct = (type: ReactElement["type"]) => {
+  if (!type) return false;
+  if (typeof type === "string") return false;
+  return Object.getPrototypeOf(type) === Component;
+};

@@ -1,5 +1,6 @@
 import { voidFunction } from "../misc/voidFunction";
 import { ReactElement } from "./types/ReactElement";
+import { deepCompare, shallowCompare } from "./compare";
 
 export abstract class ComponentLifecycle<P = any, S = any> {
   abstract readonly state: S;
@@ -14,8 +15,10 @@ export abstract class ComponentLifecycle<P = any, S = any> {
     nextProps: Readonly<P>,
     nextState: Readonly<S>
   ): boolean {
-    // TODO: deep compare
-    return nextProps !== this.props || nextState !== this.state;
+    return (
+      !deepCompare(nextProps, this.props, ) ||
+      !deepCompare(nextState, this.state, )
+    );
   }
   componentWillUpdate(nextProps: Readonly<P>, nextState: Readonly<S>) {}
 
@@ -63,7 +66,7 @@ export abstract class Component<P = any, S = any> extends ComponentLifecycle<
   isReactComponent = true;
   abstract render(): ReactElement;
 }
-Component.prototype.isReactComponent = true
+Component.prototype.isReactComponent = true;
 
 export abstract class PureComponent<P = any, S = any> extends Component<P, S> {
   shouldComponentUpdate(
@@ -71,6 +74,9 @@ export abstract class PureComponent<P = any, S = any> extends Component<P, S> {
     nextState: Readonly<S>
   ): boolean {
     // TODO: shallow compare
-    return nextProps !== this.props || nextState !== this.state;
+    return (
+      !shallowCompare(nextProps, this.props) ||
+      !shallowCompare(nextState, this.state)
+    );
   }
 }

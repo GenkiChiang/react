@@ -1,12 +1,33 @@
 import { addEvent, isEventProps, removeEvent } from "./eventHelper";
 import { Fiber } from "src/react-fiber/types/Fiber";
+import { WorkTags } from "../react-fiber/ReactWorkTags";
+import { Container } from "./types/Container";
+import { createTextNode } from "./createDomElement";
 
+export const updateTextNode = (fiber: Fiber) => {
+  const oldProps = fiber.alternate?.props;
+  // TODO:
+  if (fiber.props !== oldProps) {
+    if (fiber.return.type !== fiber.alternate.return.type) {
+      (fiber.return.stateNode as Container).appendChild(
+        (fiber.stateNode = createTextNode(fiber))
+      );
+    } else {
+      (fiber.return.stateNode as Container).replaceChild(
+        createTextNode(fiber),
+        fiber.stateNode as Node
+      );
+    }
+  }
+};
 export const updateNodeProperties = (oldDom: HTMLElement, fiber: Fiber) => {
   const { props } = fiber;
   const oldProps = fiber.alternate?.props;
 
-  if (fiber.type === "text") {
+  if (fiber.tag === WorkTags.HostText) {
     // TODO:
+    updateTextNode(fiber);
+    return;
   }
 
   Object.entries(props).forEach(([propName, propValue]) => {

@@ -1,20 +1,23 @@
 import { TaskQueue } from "../misc/TaskQueue";
 import { Fiber, RootFiber } from "../react-fiber/types/Fiber";
-import { createHostRootFiber } from "../react-fiber/Fiber";
+import { createFiberFromHostRoot } from "../react-fiber/Fiber";
 import { Container } from "src/react-dom/types/Container";
 import { WorkTags } from "../react-fiber/ReactWorkTags";
-import { ClassComponent } from "src/react/types/Component";
 import { reconcileChildDispatcher } from "./reconciler";
 import { FiberFlags } from "../react-fiber/ReactFiberFlags";
+import { updateNodeProperties } from "../react-dom/updateNodeProperties";
+import { findDomFiber } from "../react-dom/findDomNode";
+import { unmountNode } from "../react-dom/unmountNode";
 
 export const taskQueue = new TaskQueue();
 let subTask = null;
 let pendingCommit: Fiber;
+
 const getFirstTask = (): RootFiber => {
   const task = taskQueue.pop();
 
   // console.log(task)
-  const hostRootFiber = createHostRootFiber(task.props);
+  const hostRootFiber = createFiberFromHostRoot(task) as RootFiber;
   hostRootFiber.stateNode = task.stateNode as Container;
   hostRootFiber.alternate = hostRootFiber.stateNode._reactRootContainer;
   hostRootFiber.flags = hostRootFiber.stateNode._reactRootContainer
@@ -70,28 +73,52 @@ export const commitAllWork = (fiber: RootFiber) => {
   /**
    * 遍历子节点，构建dom树
    */
+  console.log(fiber.effects)
+
   fiber.effects.forEach((fiberEffect) => {
-    // if(fiber.flags===FiberFlags.Placement){
-    // }
-    if (
-      fiberEffect.tag === WorkTags.ClassComponent ||
-      fiberEffect.tag === WorkTags.FunctionComponent
-    ) {
-      return;
-    }
     let returnFiber = fiberEffect.return;
 
-    while (
-      returnFiber.tag === WorkTags.ClassComponent ||
-      returnFiber.tag === WorkTags.FunctionComponent
-    ) {
-      returnFiber = returnFiber.return;
+    if (fiberEffect.flags === FiberFlags.Update) {
+      // 节点类型相同，执行更新updateNodeProperty
+      // 节点类型不同，执行替换操作
+
+      if (fiberEffect.type === fiberEffect.alternate.type) {
+        updateNodeProperties(
+          findDomFiber(fiberEffect).stateNode as HTMLElement,
+          fiberEffect
+        );
+      } else {
+
+        (<Container>returnFiber.stateNode).replaceChild(
+          fiberEffect.stateNode as Node,
+          fiberEffect.alternate.stateNode as Node
+        );
+      }
+    } else if (fiber.flags === FiberFlags.Placement) {
+      if (
+        fiberEffect.tag === WorkTags.ClassComponent ||
+        fiberEffect.tag === WorkTags.FunctionComponent
+      ) {
+        return;
+      }
+
+      returnFiber = findDomFiber(returnFiber);
+      // {
+      //   console.log("Placement")
+      //   // console.log(returnFiber)
+      //   console.log(fiberEffect)
+      //
+      // }
+      {
+        (returnFiber.stateNode as Container).appendChild(
+          fiberEffect.stateNode as Node
+        );
+      }
+    } else if (fiberEffect.flags === FiberFlags.ChildDeletion) {
+      // TODO:
+      unmountNode(fiber, fiberEffect);
     }
 
-    // if (returnFiber.tag === WorkTags.HostComponent) {
-    (<Container>returnFiber.stateNode).appendChild(
-      fiberEffect.stateNode as Node
-    );
     // }
 
     // if (fiberEffect.tag === WorkTags.ClassComponent) {
@@ -99,7 +126,9 @@ export const commitAllWork = (fiber: RootFiber) => {
     // }
   });
 
-  (<Container>fiber.stateNode)._reactRootContainer = <RootFiber>fiber;
+  // 备份rootFiber
+  fiber.alternate = fiber;
+  (<Container>fiber.stateNode)._reactRootContainer = fiber;
 };
 export const workLoop = (idleDeadline: IdleDeadline) => {
   if (!subTask) {
