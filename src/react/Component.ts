@@ -1,6 +1,7 @@
-import { voidFunction } from "../misc/voidFunction";
 import { ReactElement } from "./types/ReactElement";
 import { deepCompare, shallowCompare } from "./compare";
+import { Fiber } from "../react-fiber/types/Fiber";
+import { ClassComponent } from "./types/Component";
 
 export abstract class ComponentLifecycle<P = any, S = any> {
   abstract readonly state: S;
@@ -8,7 +9,7 @@ export abstract class ComponentLifecycle<P = any, S = any> {
 
   componentWillMount() {}
   componentDidMount() {}
-  componentWillUnmount() {}
+  componentWillUnmount(current: Fiber, instance: ClassComponent) {}
 
   componentWillReceiveProps(nextProps: Readonly<P>) {}
   shouldComponentUpdate(
@@ -16,13 +17,17 @@ export abstract class ComponentLifecycle<P = any, S = any> {
     nextState: Readonly<S>
   ): boolean {
     return (
-      !deepCompare(nextProps, this.props, ) ||
-      !deepCompare(nextState, this.state, )
+      !deepCompare(nextProps, this.props) || !deepCompare(nextState, this.state)
     );
   }
   componentWillUpdate(nextProps: Readonly<P>, nextState: Readonly<S>) {}
 
   componentDidUpdate(prevProps: Readonly<P>, prevState: Readonly<S>) {}
+
+  getSnapshotBeforeUpdate(prevProps: Readonly<P>, prevState: Readonly<S>): any {
+    // TODO:
+    return;
+  }
 }
 export abstract class Component<P = any, S = any> extends ComponentLifecycle<
   P,
@@ -30,18 +35,18 @@ export abstract class Component<P = any, S = any> extends ComponentLifecycle<
 > {
   static defaultProps;
 
-  readonly state: S;
+  state: Readonly<S>;
   displayName?: string;
   // TODO:
   // refs: { [key: string]: ReactInstance } = {};
   // _dom: Dom;
 
-  protected constructor(public readonly props: P) {
+  protected constructor(public props: Readonly<P>) {
     super(props);
   }
   // public defaultProps;
 
-  setState(partialState: Partial<S>, callback: () => any = voidFunction): void {
+  setState(partialState: Partial<S>, callback: () => any = noop): void {
     // this.state = Object.assign({}, this.state, partialState);
     // update
     // this.update();
@@ -80,3 +85,12 @@ export abstract class PureComponent<P = any, S = any> extends Component<P, S> {
     );
   }
 }
+
+export const isClassComponent = (
+  type: ReactElement["type"]
+): type is ClassComponent => {
+  if (typeof type === "string") {
+    return false;
+  }
+  return Object.getPrototypeOf(type) === Component;
+};

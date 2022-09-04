@@ -25,3 +25,8 @@ export enum WorkTags {
   CacheComponent,
   TracingMarkerComponent,
 }
+
+export enum RootTags {
+  legacy,
+  concurrent,
+}
